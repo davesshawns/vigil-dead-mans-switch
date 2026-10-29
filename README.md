@@ -26,6 +26,25 @@ bun run dev
 ## Build
 
 ```bash
+bun install --frozen-lockfile
+bun run build
+```
+
+For Vercel, use the Vite preset, `bun run build` as the build command, and
+`dist` as the output directory. Frontend builds use the checked-in
+`src/abi/VaultRegistry.json` and do not require Foundry or `contracts/out`.
+
+The ABI is exported from `contracts/VaultRegistry.sol` and includes its
+functions, events, constructor, and custom errors. Deployment metadata is not
+the frontend ABI source: the deployment scripts can rewrite that metadata
+without preserving its ABI.
+
+After changing the contract interface, regenerate the ABI using Foundry
+(version in `.foundry-version`, compiler settings in `foundry.toml`), then
+commit the updated JSON with the contract change:
+
+```bash
+forge inspect contracts/VaultRegistry.sol:VaultRegistry abi --json > /tmp/vigil-vault-registry-abi.json && cp /tmp/vigil-vault-registry-abi.json src/abi/VaultRegistry.json
 bun run build
 ```
 
