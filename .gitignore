@@ -1,0 +1,34 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+build/
+
+# Local tooling
+.cache/
+.vite/
+coverage/
+
+# OS/editor files
+.DS_Store
+*.swp
+
+# Generated Foundry cache and build output
+contracts/cache/
+out/
+broadcast/
+
+# Arc Studio session/debug logs
+console.jsonl
+traces.jsonl
+.compass/runs/
+
+# Local dependencies
+node_modules/
