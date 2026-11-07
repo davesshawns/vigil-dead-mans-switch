@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+payload=""
+while (( $# > 0 )); do
+  case "$1" in
+    --data)
+      payload="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+request_id="$(jq -r '.id' <<<"$payload")"
+request_type="$(jq -r '.params.request_type' <<<"$payload")"
+account_id="$(jq -r '.params.account_id' <<<"$payload")"
+
+if [[ "$account_id" == "$VIGIL_CONTRACT_ID" && "$request_type" == "view_account" ]]; then
+  case "${MOCK_RPC_MODE:-matching}" in
+    missing_account)
+      jq -cn --arg id "$request_id" --arg account_id "$account_id" \
+        '{jsonrpc:"2.0",id:$id,error:{code:-32000,message:"Server error",cause:{name:"UNKNOWN_ACCOUNT",info:{account_id:$account_id}}}}'
+      ;;
+    rpc_failure)
+      echo "simulated transport failure" >&2
+      exit 7
+      ;;
+    malformed)
+      printf '%s\n' '{"jsonrpc":"2.0","id":'
+      ;;
+    missing_hash)
+      jq -cn --arg id "$request_id" '{jsonrpc:"2.0",id:$id,result:{amount:"1"}}'
+      ;;
+    rpc_error)
+      jq -cn --arg id "$request_id" \
+        '{jsonrpc:"2.0",id:$id,error:{code:-32603,message:"Internal error"}}'
+      ;;
+    matching)
+      jq -cn --arg id "$request_id" --arg code_hash "$MOCK_ACTUAL_CODE_HASH" \
+        '{jsonrpc:"2.0",id:$id,result:{code_hash:$code_hash}}'
+      ;;
+    mismatch)
+      jq -cn --arg id "$request_id" --arg code_hash "$MOCK_MISMATCH_CODE_HASH" \
+        '{jsonrpc:"2.0",id:$id,result:{code_hash:$code_hash}}'
+      ;;
+    *)
+      echo "unknown MOCK_RPC_MODE" >&2
+      exit 64
+      ;;
+  esac
+elif [[ "$request_type" == "view_account" ]]; then
+  jq -cn --arg id "$request_id" \
+    '{jsonrpc:"2.0",id:$id,result:{code_hash:"11111111111111111111111111111111"}}'
+elif [[ "$request_type" == "view_state" ]]; then
+  jq -cn --arg id "$request_id" '{jsonrpc:"2.0",id:$id,result:{values:[]}}'
+else
+  echo "unexpected RPC request" >&2
+  exit 64
+fi
