@@ -14,9 +14,13 @@ CARGO_INCREMENTAL=0 SOURCE_DATE_EPOCH=0 \
 cargo build --locked --target wasm32-unknown-unknown --release
 ```
 
-The explicit target-feature set is required with the pinned Rust 1.99 toolchain. Its defaults emit newer WebAssembly features that the current NEAR sandbox rejects during preparation.
+The explicit target-feature set is required with the pinned Rust 1.99 toolchain. Its defaults emit newer WebAssembly features that the NEAR sandbox rejects during preparation.
 
-On a host whose standard runtime can execute the near-workspaces sandbox binary:
+## Host requirements
+
+The near-workspaces sandbox downloads a precompiled `near-sandbox` binary (nearcore 2.14.0 in this suite) that requires **GLIBC 2.39**. The development host in this repository is Ubuntu 22.04 (GLIBC 2.38) and **cannot** execute the sandbox locally. The sandbox suite is therefore run by CI on `ubuntu-24.04` (see `.github/workflows/sandbox-tests.yml`), which ships GLIBC 2.39.
+
+On a GLIBC 2.39+ host (or in CI):
 
 ```bash
 cd /home/acknowlege/Desktop/usdc_dead_mans_switch_vault_tssene
@@ -25,16 +29,13 @@ cargo test --manifest-path contract/sandbox-tests/Cargo.toml \
   --target x86_64-unknown-linux-gnu -- --nocapture --test-threads=1
 ```
 
-This environment has GLIBC 2.38, while the downloaded sandbox binary requires GLIBC 2.39. The verified run used an isolated official GLIBC 2.39 runtime and this temporary wrapper path:
+Sandbox execution also needs permission to bind loopback sockets.
 
-```bash
-NEAR_SANDBOX_BIN_PATH=/tmp/vigil-near-sandbox-wrapper \
-RUSTFLAGS='-C linker=/usr/bin/gcc -C link-arg=-fuse-ld=bfd' \
-cargo test --manifest-path contract/sandbox-tests/Cargo.toml \
-  --target x86_64-unknown-linux-gnu -- --nocapture --test-threads=1
-```
+## Dependency note
 
-The wrapper launches `/tmp/vigil-near-sandbox-complete/Linux-x86_64/near-sandbox` with the loader and libraries under `/tmp/vigil-glibc-2.39`. Those temporary compatibility binaries are intentionally not committed. Sandbox execution also needs permission to bind loopback sockets.
+This suite pins `near-workspaces = "0.24"`, which pulls `near-sandbox 0.4.0` defaulting to nearcore 2.14.0. The contract is built with `near-sdk 5.30.0` (nearcore 2.14). The older `near-workspaces 0.22.x` line defaults to nearcore 2.13.4 and rejects the contract's WASM imports with `Link Error: unknown or invalid import`.
 
-Coverage includes native multi-user/multi-vault isolation, cross-owner rejection, independent vault withdrawal, time advancement, simultaneous inheritance claims, callback-forgery rejection, FT deposits, failed FT allowance and claim callback restoration, recipient registration, retry, and final FT inheritance.
+## Coverage
+
+Native multi-user/multi-vault isolation, cross-owner rejection, independent vault withdrawal, time advancement, simultaneous inheritance claims, callback-forgery rejection, FT deposits, failed FT allowance and claim callback restoration, recipient registration, retry, and final FT inheritance.
 

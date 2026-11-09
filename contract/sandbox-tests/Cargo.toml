@@ -6,6 +6,10 @@ publish = false
 
 [dev-dependencies]
 anyhow = "1"
-near-workspaces = "0.22"
+# 0.24.0 pulls near-sandbox 0.4.0, which defaults to nearcore 2.14.0.
+# The contract is built with near-sdk 5.30.0 (nearcore 2.14); the older
+# 0.22.x line defaults to nearcore 2.13.4 and rejects the contract's
+# WASM imports ("Link Error: unknown or invalid import").
+near-workspaces = "0.24"
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
