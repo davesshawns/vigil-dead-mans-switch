@@ -46,7 +46,7 @@ jobs:
       - name: Build mock FT contract
         shell: bash
         run: |
-          cd ../mock-ft
+          cd mock-ft
           RUSTFLAGS='-C target-feature=-reference-types,-multivalue,-bulk-memory' \
           CARGO_INCREMENTAL=0 SOURCE_DATE_EPOCH=0 \
           cargo build --locked --target wasm32-unknown-unknown --release
