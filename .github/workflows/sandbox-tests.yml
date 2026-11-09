@@ -1,0 +1,88 @@
+name: sandbox-tests
+
+on:
+  push:
+    paths:
+      - "contract/**"
+      - ".github/workflows/sandbox-tests.yml"
+  pull_request:
+    paths:
+      - "contract/**"
+      - ".github/workflows/sandbox-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  sandbox-lifecycle:
+    name: NEAR sandbox lifecycle tests
+    runs-on: ubuntu-24.04
+    # Ubuntu 24.04 ships GLIBC 2.39, which the near-workspaces sandbox
+    # binary requires. The local development host in this repository is
+    # Ubuntu 22.04 (GLIBC 2.38) and cannot execute the sandbox directly.
+    defaults:
+      run:
+        working-directory: contract
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (pinned 1.99)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.99.1"
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contract/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('contract/Cargo.lock', 'contract/sandbox-tests/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build mock FT contract
+        shell: bash
+        run: |
+          cd ../mock-ft
+          RUSTFLAGS='-C target-feature=-reference-types,-multivalue,-bulk-memory' \
+          CARGO_INCREMENTAL=0 SOURCE_DATE_EPOCH=0 \
+          cargo build --locked --target wasm32-unknown-unknown --release
+
+      - name: Build Vigil release WASM
+        shell: bash
+        run: |
+          RUSTFLAGS='-C target-feature=-reference-types,-multivalue,-bulk-memory' \
+          CARGO_INCREMENTAL=0 SOURCE_DATE_EPOCH=0 \
+          cargo build --locked --target wasm32-unknown-unknown --release
+          sha256sum target/wasm32-unknown-unknown/release/vigil_near.wasm
+
+      - name: Run native contract tests
+        shell: bash
+        run: |
+          cargo test --locked --target x86_64-unknown-linux-gnu 2>&1 | tee /tmp/native-tests.log
+
+      - name: Run formatting and clippy checks
+        shell: bash
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --locked --target x86_64-unknown-linux-gnu --all-targets -- -D warnings
+
+      - name: Run NEAR sandbox integration tests
+        shell: bash
+        run: |
+          RUSTFLAGS='-C linker=/usr/bin/gcc -C link-arg=-fuse-ld=bfd' \
+          cargo test --manifest-path sandbox-tests/Cargo.toml \
+            --target x86_64-unknown-linux-gnu -- --nocapture --test-threads=1 2>&1 | tee /tmp/sandbox-tests.log
+
+      - name: Upload test logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ github.run_id }}
+          path: |
+            /tmp/native-tests.log
+            /tmp/sandbox-tests.log
+          retention-days: 30
